@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>AnabuMaaz Estimator v5 — Ultimate (Complete)</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{--brand:#0b72ff}
+body{background:#f6f9ff;font-family:Inter,system-ui,Arial;margin:0;padding:18px}
+.card{border-radius:12px;box-shadow:0 10px 40px rgba(20,30,60,0.06)}
+.brand{font-weight:800;color:var(--brand);font-size:1.05rem}
+.small-muted{font-size:0.85rem;color:#6b7280}
+.result-box{background:#fff;border-radius:10px;padding:16px}
+.table-sm td, .table-sm th{padding:.35rem .45rem}
+.badge-region{background:#eef6ff;color:var(--brand);padding:.4rem .6rem;border-radius:.5rem;font-weight:700}
+.code{font-family:monospace;background:#f3f4f6;padding:4px 6px;border-radius:6px}
+.item-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed #eee}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="row justify-content-center">
+    <div class="col-xl-11 col-lg-12">
+      <div class="card p-4 mb-4">
+        <div class="d-flex align-items-center mb-3">
+          <div style="width:56px;height:56px;background:#e9f2ff;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--brand)">AM</div>
+          <div style="margin-left:12px">
+            <div class="brand">AnabuMaaz — Estimator v5 Ultimate</div>
+            <div class="small-muted">Full turnkey BOQ + BBS + Billing templates. Delhi (INR) &amp; Gulf (AED) rates included.</div>
+          </div>
+          <div class="ms-auto text-end">
+            <div class="badge-region" id="regionBadge">Region: Delhi</div>
+            <div class="small-muted" style="font-size:0.85rem">Version: v5-final</div>
+          </div>
+        </div>
+
+        <!-- INPUTS -->
+        <form id="frm">
+          <div class="row g-2">
+            <div class="col-md-4"><label>Project name</label><input id="projName" class="form-control" placeholder="Project"></div>
+            <div class="col-md-4"><label>Client / Vendor</label><input id="projClient" class="form-control" placeholder="Client or Vendor"></div>
+            <div class="col-md-4"><label>City</label><input id="projCity" class="form-control" placeholder="Delhi / Dubai"></div>
+            <div class="col-md-3"><label>Built-up area (sq ft)</label><input id="area" type="number" class="form-control" value="1200"></div>
+            <div class="col-md-2"><label>Floors</label><input id="floors" type="number" class="form-control" value="1"></div>
+            <div class="col-md-3"><label>Quality</label><select id="quality" class="form-select"><option value="basic">Basic</option><option value="standard" selected>Standard</option><option value="premium">Premium</option></select></div>
+            <div class="col-md-4"><label>Concrete grade</label><select id="conc" class="form-select"><option>M20</option><option>M25</option><option selected>M30</option><option>M35</option><option>M40</option></select></div>
+            <div class="col-md-4"><label>Rate set</label>
+              <select id="rateSet" class="form-select">
+                <option value="delhi">Delhi (INR)</option>
+                <option value="gulf">Gulf (AED)</option>
+              </select>
+            </div>
+
+            <div class="col-12">
+              <label>Include sections</label>
+              <div class="d-flex flex-wrap gap-2">
+                <label><input type="checkbox" class="sec" value="structure" checked> Structure</label>
+                <label><input type="checkbox" class="sec" value="finishing" checked> Finishing</label>
+                <label><input type="checkbox" class="sec" value="upvc" checked> UPVC</label>
+                <label><input type="checkbox" class="sec" value="aluminium"> Aluminium</label>
+                <label><input type="checkbox" class="sec" value="ms"> MS/Steel</label>
+                <label><input type="checkbox" class="sec" value="pvc"> PVC & Drainage</label>
+                <label><input type="checkbox" class="sec" value="services"> Services (MEP)</label>
+                <label><input type="checkbox" class="sec" value="interior"> Interior</label>
+                <label><input type="checkbox" class="sec" value="firefighting"> Fire Fighting</label>
+                <label><input type="checkbox" class="sec" value="handover"> Handover</label>
+              </div>
+            </div>
+
+            <div class="col-12"><label>Notes</label><textarea id="notes" class="form-control" rows="2"></textarea></div>
+
+            <div class="col-12 text-end">
+              <button type="button" id="generate" class="btn btn-primary">Generate Full Estimate</button>
+              <button type="button" id="downloadPdf" class="btn btn-outline-secondary" disabled>Download PDF</button>
+              <button type="button" id="exportCsv" class="btn btn-outline-info">Export CSV</button>
+              <button type="button" id="saveLocal" class="btn btn-success">Save Local</button>
+              <button type="button" id="shareWa" class="btn btn-success" disabled>Share WhatsApp</button>
+            </div>
+          </div>
+        </form>
+
+        <hr>
+
+        <div id="result" class="result-box"><em>No estimate yet — click Generate.</em></div>
+
+        <div class="mt-3 small-muted">This single-file estimator produces itemised BOQ, approximate BBS, bills (structure/finishing), vendor invoice template, CSV & PDF exports. After testing I will add chargeable BBS export, Excel templates and vendor workflows on request.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Comprehensive rate table (Delhi INR / Gulf AED)
+const RATES = {
+  delhi: {
+    currency:'INR', note:'Delhi NCR reference.',
+    structural:{excav:320,pcc:7000,rcc_M20:7000,rcc_M25:7300,rcc_M30:7600,rcc_M35:7900,rcc_M40:8200,steel_kg:125,shuttering_sqm:220,masonry_cum:3800,plaster_sqm:150,flooring_sqm:900,paint_sqm:50},
+    finishing:{skirting_per_sqm:650,door:9000,window:5500,vitrified:900,ceramic_sqm:380},
+    upvc:{frame_lm:850,glazing_sqm:1800,door_lm:1200},
+    aluminium:{alu_frame_lm:1400,glass_sqm:2400,alu_clad_sqm:2000,alu_fix_lump:12000},
+    ms:{kg_rate:120,plate_sqm:2600,cut_kg:6,bend_kg:9,weld_kg:13},
+    pvc:{pipe_m:95,door_each:4800,skirting_m:70},
+    services:{ele_point:1400,wiring_sqm:60,plumb_point:2400},
+    interior:{false_ceiling_sqm:550,mod_kitchen:140000,wardrobe_rm:9500,tv_unit:48000,wood_floor_sqm:1000},
+    firefight:{hydrant_set:28000,sprink_head:1400,extinguisher:2800},
+    misc:{waste_cum:320,site_plan:9000,handover_clean:28000,asbuilt:14000}
+  },
+  gulf: {
+    currency:'AED', note:'Gulf approx. 1 AED ≈ 22 INR.',
+    structural:{excav:15,pcc:340,rcc_M20:340,rcc_M25:360,rcc_M30:375,rcc_M35:390,rcc_M40:405,steel_kg:0.65,shuttering_sqm:11,masonry_cum:190,plaster_sqm:8,flooring_sqm:45,paint_sqm:2.5},
+    finishing:{skirting_per_sqm:30,door:45,window:30,vitrified:45,ceramic_sqm:18},
+    upvc:{frame_lm:40,glazing_sqm:90,door_lm:55},
+    aluminium:{alu_frame_lm:65,glass_sqm:110,alu_clad_sqm:95,alu_fix_lump:600},
+    ms:{kg_rate:0.6,plate_sqm:120,cut_kg:0.3,bend_kg:0.4,weld_kg:0.6},
+    pvc:{pipe_m:4.5,door_each:220,skirting_m:3.5},
+    services:{ele_point:70,wiring_sqm:3,plumb_point:120},
+    interior:{false_ceiling_sqm:30,mod_kitchen:6500,wardrobe_rm:450,tv_unit:2200,wood_floor_sqm:55},
+    firefight:{hydrant_set:1400,sprink_head:65,extinguisher:140},
+    misc:{waste_cum:16,site_plan:450,handover_clean:1400,asbuilt:700}
+  }
+};
+
+function fmt(v,currency){
+  if(currency==='INR') return '₹' + Math.round(v).toLocaleString('en-IN');
+  if(currency==='AED') return 'د.إ ' + (Math.round(v*100)/100);
+  return v;
+}
+
+function selectedSections(){ return Array.from(document.querySelectorAll('.sec:checked')).map(n=>n.value); }
+function getRateSet(){ return document.getElementById('rateSet').value; }
+function getRates(){ return RATES[getRateSet()]; }
+
+function estimateQuant(area,floors){
+  const built = area * floors;
+  return {
+    builtArea: built,
+    slabCum: built * 0.11,
+    colBeamCum: built * 0.065,
+    footingCum: built * 0.05,
+    masonryCum: built * 0.28,
+    plasterSqm: built * 1.9,
+    floorSqm: built
+  };
+}
+
+// BBS generator (detailed)
+function genBBS(steelKg){
+  const distribution=[{dia:8,share:0.12,kgm:0.395},{dia:10,share:0.18,kgm:0.62},{dia:12,share:0.30,kgm:0.888},{dia:16,share:0.25,kgm:1.58},{dia:20,share:0.10,kgm:2.47}];
+  const out=[];
+  distribution.forEach(d=>{
+    const kg = Math.round(steelKg * d.share);
+    const meters = Math.round((kg / d.kgm) * 100)/100;
+    const pieces = Math.max(1, Math.round(meters / 6));
+    out.push({dia:d.dia,kg,meters,pieces});
+  });
+  return out;
+}
+
+function buildEstimate(){
+  const area = Number(document.getElementById('area').value) || 0;
+  const floors = Number(document.getElementById('floors').value) || 1;
+  const projName = document.getElementById('projName').value.trim();
+  const client = document.getElementById('projClient').value.trim();
+  const city = document.getElementById('projCity').value.trim();
+  const quality = document.getElementById('quality').value;
+  const conc = document.getElementById('conc').value;
+  const notes = document.getElementById('notes').value.trim();
+  const rates = getRates();
+  document.getElementById('regionBadge').innerText = 'Region: ' + (getRateSet()==='delhi' ? 'Delhi (INR)' : 'Gulf (AED)');
+  const q = estimateQuant(area,floors);
+  const secs = selectedSections();
+  const items = [];
+
+  // Prelims
+  items.push({code:'PRE_SITE',item:'Site plan & soil test (lump)',qty:1,unit:'lump',rate:rates.misc.site_plan,amount:rates.misc.site_plan});
+
+  // Structure
+  if(secs.includes('structure')){
+    const rccKey = 'rcc_' + conc;
+    const rccRate = (rates.structural[rccKey] !== undefined) ? rates.structural[rccKey] : (rates.structural.rcc_M30 || rates.structural.rcc_M20);
+    items.push({code:'EXC',item:'Excavation (cum)',qty:Math.round(q.footingCum*100)/100,unit:'cum',rate:rates.structural.excav,amount:Math.round(q.footingCum*100)/100 * rates.structural.excav});
+    items.push({code:'PCC',item:'PCC (cum)',qty:Math.round(q.footingCum*100)/100,unit:'cum',rate:rates.structural.pcc,amount:Math.round(q.footingCum*100)/100 * rates.structural.pcc});
+    const rccCum = q.slabCum + q.colBeamCum;
+    items.push({code:'RCC',item:`RCC ${conc} (cum)`,qty:Math.round(rccCum*100)/100,unit:'cum',rate:rccRate,amount:Math.round(rccCum*100)/100 * rccRate});
+    const steelKg = Math.round(rccCum * 85);
+    items.push({code:'REBAR',item:'Reinforcement steel (kg)',qty:steelKg,unit:'kg',rate:rates.structural.steel_kg || rates.ms.kg_rate,amount:steelKg * (rates.structural.steel_kg || rates.ms.kg_rate)});
+    items.push({code:'SHUT',item:'Shuttering (sqm)',qty:Math.round((rccCum*4)*100)/100,unit:'sqm',rate:rates.structural.shuttering_sqm,amount:Math.round((rccCum*4)*100)/100 * rates.structural.shuttering_sqm});
+    items.push({code:'MASON',item:'Masonry (cum)',qty:Math.round(q.masonryCum*100)/100,unit:'cum',rate:rates.structural.masonry_cum,amount:Math.round(q.masonryCum*100)/100 * rates.structural.masonry_cum});
+    items.push({code:'PLAST',item:'Plaster (sqm)',qty:Math.round(q.plasterSqm*100)/100,unit:'sqm',rate:rates.structural.plaster_sqm,amount:Math.round(q.plasterSqm*100)/100 * rates.structural.plaster_sqm});
+  }
+
+  // Finishing
+  if(secs.includes('finishing')){
+    items.push({code:'FLOOR',item:'Vitrified tiles (sqm)',qty:Math.round(q.floorSqm*100)/100,unit:'sqm',rate:rates.finishing.vitrified,amount:Math.round(q.floorSqm*100)/100 * rates.finishing.vitrified});
+    items.push({code:'SK',item:'Skirting (sqm)',qty:Math.round(q.floorSqm*0.12*100)/100,unit:'sqm',rate:rates.finishing.skirting_per_sqm,amount:Math.round(q.floorSqm*0.12*100)/100 * rates.finishing.skirting_per_sqm});
+    const doors = Math.max(4, Math.round(area/180));
+    items.push({code:'DOOR',item:'Doors (each)',qty:doors,unit:'no',rate:rates.finishing.door,amount:doors * rates.finishing.door});
+    const wins = Math.max(4, Math.round(area/160));
+    items.push({code:'WIN',item:'Windows (each)',qty:wins,unit:'no',rate:rates.finishing.window,amount:wins * rates.finishing.window});
+  }
+
+  // UPVC
+  if(secs.includes('upvc')){
+    const upvcLm = Math.max(10, Math.round(area/28));
+    items.push({code:'UPVC_F',item:'uPVC frame (lm)',qty:upvcLm,unit:'lm',rate:rates.upvc.frame_lm,amount:upvcLm * rates.upvc.frame_lm});
+    const gla = Math.max(2, Math.round(area/45));
+    items.push({code:'UPVC_G',item:'uPVC glazing (sqm)',qty:gla,unit:'sqm',rate:rates.upvc.glazing_sqm,amount:gla * rates.upvc.glazing_sqm});
+    items.push({code:'UPVC_D',item:'uPVC door (lm)',qty:Math.max(0,Math.round(area/200)),unit:'lm',rate:rates.upvc.door_lm,amount:Math.max(0,Math.round(area/200)) * rates.upvc.door_lm});
+  }
+
+  // Aluminium
+  if(secs.includes('aluminium')){
+    const aluLm = Math.max(8, Math.round(area/30));
+    items.push({code:'ALU_F',item:'Aluminium frame (lm)',qty:aluLm,unit:'lm',rate:rates.aluminium.alu_frame_lm,amount:aluLm * rates.aluminium.alu_frame_lm});
+    const glass = Math.max(2, Math.round(area/40));
+    items.push({code:'ALU_G',item:'Aluminium glass (sqm)',qty:glass,unit:'sqm',rate:rates.aluminium.glass_sqm,amount:glass * rates.aluminium.glass_sqm});
+    items.push({code:'ALU_C',item:'Aluminium cladding (sqm)',qty:glass,unit:'sqm',rate:rates.aluminium.alu_clad_sqm,amount:glass * rates.aluminium.alu_clad_sqm});
+  }
+
+  // MS / Fabrication
+  if(secs.includes('ms')){
+    const msKg = Math.round((q.slabCum+q.colBeamCum)*62);
+    items.push({code:'MS_SUP',item:'MS steel supply (kg)',qty:msKg,unit:'kg',rate:rates.ms.kg_rate,amount:msKg * rates.ms.kg_rate});
+    items.push({code:'MS_PLT',item:'MS plate work (sqm)',qty:Math.round(area/45),unit:'sqm',rate:rates.ms.plate_sqm,amount:Math.round(area/45) * rates.ms.plate_sqm});
+    items.push({code:'MS_CUT',item:'MS cutting (kg)',qty:msKg,unit:'kg',rate:rates.ms.cut_kg,amount:msKg * rates.ms.cut_kg});
+    items.push({code:'MS_B',item:'MS bending (kg)',qty:msKg,unit:'kg',rate:rates.ms.bend_kg,amount:msKg * rates.ms.bend_kg});
+    items.push({code:'MS_W',item:'MS welding/erection (kg)',qty:msKg,unit:'kg',rate:rates.ms.weld_kg,amount:msKg * rates.ms.weld_kg});
+  }
+
+  // PVC & Drainage
+  if(secs.includes('pvc')){
+    items.push({code:'PVC_P',item:'PVC drainage pipe (m)',qty:Math.round(area/2),unit:'m',rate:rates.pvc.pipe_m,amount:Math.round(area/2) * rates.pvc.pipe_m});
+    items.push({code:'PVC_D',item:'PVC door (each)',qty:Math.max(0,Math.round(area/200)),unit:'no',rate:rates.pvc.door_each,amount:Math.max(0,Math.round(area/200)) * rates.pvc.door_each});
+  }
+
+  // Services (MEP)
+  if(secs.includes('services')){
+    const elePoints = Math.max(12, Math.round(area/55));
+    items.push({code:'EL_PT',item:'Electrical points (each)',qty:elePoints,unit:'no',rate:rates.services.ele_point,amount:elePoints * rates.services.ele_point});
+    items.push({code:'WIR',item:'Wiring (per sqm)',qty:area,unit:'sqm',rate:rates.services.wiring_sqm,amount:area * rates.services.wiring_sqm});
+    const plPoints = Math.max(4, Math.round(area/140));
+    items.push({code:'PL_PT',item:'Plumbing points (each)',qty:plPoints,unit:'no',rate:rates.services.plumb_point,amount:plPoints * rates.services.plumb_point});
+  }
+
+  // Interior
+  if(secs.includes('interior')){
+    items.push({code:'INT_FC',item:'False ceiling (sqm)',qty:Math.round(q.floorSqm*100)/100,unit:'sqm',rate:rates.interior.false_ceiling_sqm,amount:Math.round(q.floorSqm*100)/100 * rates.interior.false_ceiling_sqm});
+    items.push({code:'INT_K',item:'Modular kitchen (lump)',qty:1,unit:'lump',rate:rates.interior.mod_kitchen,amount:rates.interior.mod_kitchen});
+    const wr = Math.max(1, Math.round(area/85));
+    items.push({code:'INT_W',item:'Wardrobe (rm)',qty:wr,unit:'rm',rate:rates.interior.wardrobe_rm,amount:wr * rates.interior.wardrobe_rm});
+  }
+
+  // Firefighting
+  if(secs.includes('firefighting')){
+    items.push({code:'FF_H',item:'Hydrant set / pump',qty:1,unit:'set',rate:rates.firefight.hydrant_set,amount:rates.firefight.hydrant_set});
+    const heads = Math.max(4, Math.round(area/90));
+    items.push({code:'FF_S',item:'Sprinkler heads',qty:heads,unit:'no',rate:rates.firefight.sprink_head,amount:heads * rates.firefight.sprink_head});
+    items.push({code:'FF_E',item:'Fire extinguisher',qty:Math.max(2,Math.round(area/450)),unit:'no',rate:rates.firefight.extinguisher,amount:Math.max(2,Math.round(area/450)) * rates.firefight.extinguisher});
+  }
+
+  // Handover & misc
+  items.push({code:'WASTE',item:'Waste disposal (cum)',qty:Math.round((q.slabCum+q.colBeamCum+q.footingCum)*0.22),unit:'cum',rate:rates.misc.waste_cum,amount:Math.round((q.slabCum+q.colBeamCum+q.footingCum)*0.22) * rates.misc.waste_cum});
+  items.push({code:'HD_CL',item:'Final cleaning & handover (lump)',qty:1,unit:'lump',rate:rates.misc.handover_clean,amount:rates.misc.handover_clean});
+  items.push({code:'HD_AS',item:'As-built drawings (lump)',qty:1,unit:'lump',rate:rates.misc.asbuilt,amount:rates.misc.asbuilt});
+
+  // totals
+  const subtotal = items.reduce((s,i)=>s + (i.amount||0),0);
+  const contingency = Math.round(subtotal * 0.06);
+  const gst = Math.round(subtotal * 0.18);
+  const grand = subtotal + contingency + gst;
+
+  // BBS generation using REBAR qty if present
+  const rebar = items.find(it=>it.code==='REBAR');
+  const steelKg = rebar ? rebar.qty : Math.round((q.slabCum+q.colBeamCum) * 85);
+  const bbs = genBBS(steelKg);
+
+  // Build outputs
+  let out = `<div class="d-flex justify-content-between"><div><h5>${projName || 'Project'} • ${city || ''}</h5><div class="small-muted">Client: ${client || '-'}</div></div><div class="text-end"><div style="font-weight:800;font-size:1.1rem">${fmt(grand,rates.currency)}</div><div class="small-muted">Estimated total (${rates.currency})</div></div></div><hr>`;
+
+  // BOQ table
+  out += `<h6>Itemised BOQ</h6><div style="max-height:360px;overflow:auto"><table class="table table-sm"><thead><tr><th>Code</th><th>Item</th><th>Qty</th><th>Unit</th><th>Rate</th><th class="text-end">Amount</th></tr></thead><tbody>`;
+  items.forEach(it=> out += `<tr><td class="code">${it.code}</td><td>${it.item}</td><td>${it.qty}</td><td>${it.unit}</td><td>${fmt(it.rate,rates.currency)}</td><td class="text-end">${fmt(it.amount,rates.currency)}</td></tr>`);
+  out += `</tbody></table></div>`;
+
+  // BBS table
+  out += `<h6 class="mt-3">Bar-Bending Schedule (BBS) — approx</h6><table class="table table-sm"><thead><tr><th>Dia (mm)</th><th>Kg</th><th>Meters</th><th>Pieces</th></tr></thead><tbody>`;
+  bbs.forEach(b=> out += `<tr><td>${b.dia}</td><td>${b.kg}</td><td>${b.meters}</td><td>${b.pieces}</td></tr>`);
+  out += `</tbody></table>`;
+
+  // Bills: structure and finishing
+  const billStructure = items.filter(i=>['EXC','PCC','RCC','REBAR','SHUT','MASON','PLAST'].includes(i.code));
+  const billFinish = items.filter(i=>['FLOOR','SK','DOOR','WIN'].includes(i.code));
+  out += `<h6 class="mt-3">Bill of Structure</h6><table class="table table-sm"><thead><tr><th>Item</th><th>Qty</th><th>Unit</th><th class="text-end">Amount</th></tr></thead><tbody>`;
+  billStructure.forEach(b=> out += `<tr><td>${b.item}</td><td>${b.qty}</td><td>${b.unit}</td><td class="text-end">${fmt(b.amount,rates.currency)}</td></tr>`);
+  out += `<tr><td colspan="3"><strong>Subtotal</strong></td><td class="text-end"><strong>${fmt(billStructure.reduce((s,i)=>s+(i.amount||0),0),rates.currency)}</strong></td></tr></tbody></table>`;
+
+  out += `<h6 class="mt-3">Bill of Finishing</h6><table class="table table-sm"><thead><tr><th>Item</th><th>Qty</th><th>Unit</th><th class="text-end">Amount</th></tr></thead><tbody>`;
+  billFinish.forEach(b=> out += `<tr><td>${b.item}</td><td>${b.qty}</td><td>${b.unit}</td><td class="text-end">${fmt(b.amount,rates.currency)}</td></tr>`);
+  out += `<tr><td colspan="3"><strong>Subtotal</strong></td><td class="text-end"><strong>${fmt(billFinish.reduce((s,i)=>s+(i.amount||0),0),rates.currency)}</strong></td></tr></tbody></table>`;
+
+  // Totals
+  out += `<div class="mt-3"><div class="item-row"><div>Subtotal</div><div>${fmt(subtotal,rates.currency)}</div></div>`;
+  out += `<div class="item-row"><div>Contingency (6%)</div><div>${fmt(contingency,rates.currency)}</div></div>`;
+  out += `<div class="item-row"><div>GST (18%)</div><div>${fmt(gst,rates.currency)}</div></div>`;
+  out += `<div class="item-row" style="font-weight:900;border-top:1px solid #eee"><div>Grand Total</div><div>${fmt(grand,rates.currency)}</div></div></div>`;
+
+  out += `<div class="mt-2 small-muted">Notes: ${notes || '-'} • Rate set: ${getRateSet()} • ${rates.note}</div>`;
+
+  document.getElementById('result').innerHTML = out;
+
+  // store last estimate for export/pdf/share
+  window.last = {projName,client,city,area,floors,quality,conc,notes,items,bbs,subtotal,contingency,gst,grand,rates};
+  document.getElementById('downloadPdf').disabled = false;
+  document.getElementById('shareWa').disabled = false;
+}
+
+// events
+document.getElementById('generate').addEventListener('click', buildEstimate);
+
+document.getElementById('exportCsv').addEventListener('click', ()=>{
+  if(!window.last){ alert('Generate first'); return; }
+  let csv = 'code,item,qty,unit,rate,amount\n';
+  window.last.items.forEach(i=> csv += `${i.code},"${i.item}",${i.qty},${i.unit},${i.rate},${i.amount}\n`);
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download='anabumaaz_boq_v5.csv'; a.click(); URL.revokeObjectURL(url);
+});
+
+document.getElementById('saveLocal').addEventListener('click', ()=>{
+  if(!window.last){ alert('Generate first'); return; }
+  localStorage.setItem('anabumaaz_v5_estimate', JSON.stringify(window.last));
+  alert('Saved locally (anabumaaz_v5_estimate).');
+});
+
+document.getElementById('shareWa').addEventListener('click', ()=>{
+  if(!window.last){ alert('Generate first'); return; }
+  const text = `AnabuMaaz Estimate: ${window.last.projName || ''} Total: ${window.last.grand} ${window.last.rates.currency}`;
+  window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank');
+});
+
+// PDF
+document.getElementById('downloadPdf').addEventListener('click', ()=>{
+  if(!window.last){ alert('Generate first'); return; }
+  const est = window.last;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({unit:'pt',format:'a4'}); let y=40;
+  doc.setFontSize(14); doc.text('AnabuMaaz — Full BOQ Estimate v5', 40, y); y+=18;
+  doc.setFontSize(10); doc.text(`Project: ${est.projName || '-'}  Client: ${est.client || '-'}`,40,y); y+=14;
+  doc.text(`City: ${est.city || '-'}  Area: ${est.area} sq ft  Floors: ${est.floors}`,40,y); y+=16;
+  doc.text(`Rate set: ${getRateSet()}  Quality: ${est.quality}  Concrete: ${est.conc}`,40,y); y+=18;
+  doc.setFontSize(9);
+  est.items.forEach(it=>{
+    const line = `${it.code} | ${it.item} | ${it.qty} ${it.unit} | ${fmt(it.amount, est.rates.currency)}`;
+    doc.text(line, 40, y); y+=12;
+    if(y>740){ doc.addPage(); y=40; }
+  });
+  y+=10; doc.text('Subtotal: ' + fmt(est.subtotal, est.rates.currency),40,y); y+=12;
+  doc.text('Contingency: ' + fmt(est.contingency, est.rates.currency),40,y); y+=12;
+  doc.text('GST: ' + fmt(est.gst, est.rates.currency),40,y); y+=12;
+  doc.setFontSize(12); doc.text('Grand Total: ' + fmt(est.grand, est.rates.currency),40,y);
+  const fn = (est.projName?est.projName.split(' ').join('_'):'AnabuMaaz') + '_BOQ_v5.pdf';
+  doc.save(fn);
+});
+</script>
+</body>
+</html>
